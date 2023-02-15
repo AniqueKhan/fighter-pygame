@@ -5,36 +5,39 @@ class Fighter():
     def __init__(self,x,y):
         self.rect = pg.Rect(x, y, 80, 180)
         self.y_velocity = self.attack_type = 0
-        self.jumping = False
+        self.jumping = self.attacking = False
+        self.health = 100
 
     def draw(self,surface):
         pg.draw.rect(surface,RED,self.rect)
 
-    def move(self,surface):
+    def move(self,surface,target):
         dx = dy = 0
 
         # Get Key Presses
         key = pg.key.get_pressed()
 
-        # Movement
-        if key[pg.K_a]:
-            dx = -FIGHTER_SPEED
-        if key[pg.K_d]:
-            dx = FIGHTER_SPEED
+        # Can only perform other actions if not currently attacking
+        if not self.attacking:
+            # Movement
+            if key[pg.K_a]:
+                dx = -FIGHTER_SPEED
+            if key[pg.K_d]:
+                dx = FIGHTER_SPEED
 
-        # Jump
-        if key[pg.K_w] and not self.jumping:
-            self.y_velocity = -30
-            self.jumping = True
-        
-        # Attack
-        if key[pg.K_p] or key[pg.K_l]:
-            self.attack(surface=surface)
-            # Attack Initiated
-            if key[pg.K_p]:
-                self.attack_type=1
-            if key[pg.K_t]:
-                self.attack_type=2
+            # Jump
+            if key[pg.K_w] and not self.jumping:
+                self.y_velocity = -30
+                self.jumping = True
+            
+            # Attack
+            if key[pg.K_p] or key[pg.K_l]:
+                self.attack(surface=surface,target=target)
+                # Attack Initiated
+                if key[pg.K_p]:
+                    self.attack_type=1
+                if key[pg.K_t]:
+                    self.attack_type=2
 
         # Apply Gravity
         self.y_velocity += GRAVITY
@@ -58,6 +61,12 @@ class Fighter():
         self.rect.x +=dx
         self.rect.y +=dy
 
-    def attack(self,surface):
+    def attack(self,surface,target):
+        self.attacking = True
+
         attacking_rect = pg.Rect(self.rect.centerx, self.rect.y,2*self.rect.width,self.rect.height)
+
+        if attacking_rect.colliderect(target.rect):
+            target.health -= 10
+
         pg.draw.rect(surface, GREEN,attacking_rect)
