@@ -2,7 +2,10 @@ import pygame as pg
 from constants import *
 
 class Fighter():
-    def __init__(self,x,y,flip,data,sprite_spreedsheet,animation_steps):
+    def __init__(self,player,x,y,flip,data,sprite_spreedsheet,animation_steps,attack_sound):
+
+        self.player = player
+        self.attack_sound = attack_sound
 
         # 0:Idle 1:Run 2:Jump 3:Attack1 4:Attack2 5:Hit 6:Death --> Action Sequence
         self.y_velocity = self.attack_type = self.attack_cooldown = self.frame_index = self.action = 0
@@ -85,10 +88,9 @@ class Fighter():
 
     def draw(self,surface):
         img = pg.transform.flip(surface=self.image, flip_x=self.flip, flip_y=False)
-        pg.draw.rect(surface,RED,self.rect)
         surface.blit(source=img,dest=(self.rect.x - (self.offset[0]*self.image_scale) ,self.rect.y - (self.offset[1]*self.image_scale)))
 
-    def move(self,surface,target):
+    def move(self,target,round_over):
         dx = dy = 0
         self.running ,self.attack_type = False , 0
 
@@ -96,28 +98,48 @@ class Fighter():
         key = pg.key.get_pressed()
 
         # Can only perform other actions if not currently attacking
-        if not self.attacking:
-            # Movement
-            if key[pg.K_a]:
-                dx = -FIGHTER_SPEED
-                self.running = True
-            if key[pg.K_d]:
-                dx = FIGHTER_SPEED
-                self.running = True
+        if not self.attacking and not self.dead and not round_over:
+            if self.player==1:
+                # Movement
+                if key[pg.K_a]:
+                    dx = -FIGHTER_SPEED
+                    self.running = True
+                if key[pg.K_d]:
+                    dx = FIGHTER_SPEED
+                    self.running = True
 
-            # Jump
-            if key[pg.K_w] and not self.jumping:
-                self.y_velocity = -30
-                self.jumping = True
+                # Jump
+                if key[pg.K_w] and not self.jumping:
+                    self.y_velocity = -30
+                    self.jumping = True
+                
+                # Attack
+                if key[pg.K_t] or key[pg.K_f]:
+                    self.attack(target=target)
+                    # Attack Initiated
+                    if key[pg.K_t]: self.attack_type=1
+                    if key[pg.K_f]: self.attack_type=2
             
-            # Attack
-            if key[pg.K_p] or key[pg.K_l]:
-                self.attack(surface=surface,target=target)
-                # Attack Initiated
-                if key[pg.K_p]:
-                    self.attack_type=1
-                if key[pg.K_l]:
-                    self.attack_type=2
+            if self.player==2:
+                # Movement
+                if key[pg.K_LEFT]:
+                    dx = -FIGHTER_SPEED
+                    self.running = True
+                if key[pg.K_RIGHT]:
+                    dx = FIGHTER_SPEED
+                    self.running = True
+
+                # Jump
+                if key[pg.K_UP] and not self.jumping:
+                    self.y_velocity = -30
+                    self.jumping = True
+                
+                # Attack
+                if key[pg.K_p] or key[pg.K_l]:
+                    self.attack(target=target)
+                    # Attack Initiated
+                    if key[pg.K_p]: self.attack_type=1
+                    if key[pg.K_l]: self.attack_type=2
 
         # Apply Gravity
         self.y_velocity += GRAVITY
@@ -147,9 +169,10 @@ class Fighter():
         self.rect.x +=dx
         self.rect.y +=dy
 
-    def attack(self,surface,target):
+    def attack(self,target):
         if not self.attack_cooldown:
             self.attacking = True
+            self.attack_sound.play()
 
             attacking_rect = pg.Rect(self.rect.centerx - (2*self.rect.width*self.flip), self.rect.y,2*self.rect.width,self.rect.height)
 
@@ -157,4 +180,3 @@ class Fighter():
                 target.health -= 10
                 target.hit = True
 
-            pg.draw.rect(surface, GREEN,attacking_rect)

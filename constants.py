@@ -1,5 +1,8 @@
+import pygame as pg
+# Screen Dimensions
 SCREEN_WIDTH,SCREEN_HEIGHT = 1000,600
 
+# Colors
 RED = (255,0,0)
 GREEN = (0,255,0)
 YELLOW = (255,255,0)
@@ -10,4 +13,24 @@ FIGHTER_SPEED = 10
 
 GRAVITY = 2
 
+# Frames per second
 FPS = 60
+
+# Define number of steps in each animation
+WARRIOR_ANIMATION = [10,8,1,7,7,3,7]
+WIZARD_ANIMATION = [8,8,1,8,8,3,7]
+
+# Fighter Data
+WARRIOR_SIZE , WIZARD_SIZE = 162 , 250
+WARRIOR_SCALE , WIZARD_SCALE = 4 , 3
+WARRIOR_OFFSET , WIZARD_OFFSET = [72,56] , [112,107]
+WARRIOR_DATA , WIZARD_DATA = {} , {}
+WARRIOR_DATA['SIZE'],WARRIOR_DATA['SCALE'],WARRIOR_DATA['OFFSET'] = WARRIOR_SIZE,WARRIOR_SCALE,WARRIOR_OFFSET
+WIZARD_DATA['SIZE'],WIZARD_DATA['SCALE'],WIZARD_DATA['OFFSET'] = WIZARD_SIZE,WIZARD_SCALE,WIZARD_OFFSET
+
+# Introduction Countdown
+INTRO_COUNT = 3
+
+# Round Over Cooldown --> Wait for 2 seconds after round is finished
+ROUND_OVER_COOLDOWN = 2000
+
