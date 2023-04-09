@@ -1,10 +1,45 @@
 import pygame as pg
-from fighter import Fighter
-from constants import *
 
 # Initialization
 pg.mixer.init()
 pg.init()
+
+# Constants
+
+# Screen Dimensions
+SCREEN_WIDTH,SCREEN_HEIGHT = 1000,600
+
+# Colors
+RED = (255,0,0)
+GREEN = (0,255,0)
+YELLOW = (255,255,0)
+WHITE = (255,255,255)
+BLUE = (0,0,255)
+
+FIGHTER_SPEED = 10
+
+GRAVITY = 2
+
+# Frames per second
+FPS = 60
+
+# Define number of steps in each animation
+WARRIOR_ANIMATION = [10,8,1,7,7,3,7]
+WIZARD_ANIMATION = [8,8,1,8,8,3,7]
+
+# Fighter Data
+WARRIOR_SIZE , WIZARD_SIZE = 162 , 250
+WARRIOR_SCALE , WIZARD_SCALE = 4 , 3
+WARRIOR_OFFSET , WIZARD_OFFSET = [72,56] , [112,107]
+WARRIOR_DATA , WIZARD_DATA = {} , {}
+WARRIOR_DATA['SIZE'],WARRIOR_DATA['SCALE'],WARRIOR_DATA['OFFSET'] = WARRIOR_SIZE,WARRIOR_SCALE,WARRIOR_OFFSET
+WIZARD_DATA['SIZE'],WIZARD_DATA['SCALE'],WIZARD_DATA['OFFSET'] = WIZARD_SIZE,WIZARD_SCALE,WIZARD_OFFSET
+
+# Introduction Countdown
+INTRO_COUNT = 3
+
+# Round Over Cooldown --> Wait for 2 seconds after round is finished
+ROUND_OVER_COOLDOWN = 2000
 
 # Screen
 screen = pg.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
@@ -46,6 +81,190 @@ round_over = False
 
 # Intro Count
 intro_count = INTRO_COUNT
+
+
+class Fighter():
+    def __init__(self,player,x,y,flip,data,sprite_spreedsheet,animation_steps,attack_sound):
+
+        self.player = player
+        self.attack_sound = attack_sound
+
+        # 0:Idle 1:Run 2:Jump 3:Attack1 4:Attack2 5:Hit 6:Death --> Action Sequence
+        self.y_velocity = self.attack_type = self.attack_cooldown = self.frame_index = self.action = 0
+
+        self.size,self.image_scale ,self.offset= data["SIZE"],data["SCALE"],data["OFFSET"]
+        self.animation_list = self.load_images(sprite_spreedsheet=sprite_spreedsheet,animation_steps=animation_steps)
+        self.update_time = pg.time.get_ticks()
+        self.rect = pg.Rect(x, y, 80, 180)
+         
+        self.image = self.animation_list[self.action][self.frame_index]
+        self.jumping = self.attacking = self.running = self.hit = self.dead = False
+        self.flip = flip
+        self.health = 100
+
+    # Handle Animation Updates
+    def update(self):
+        animation_cooldown = 70
+
+        # Check what action the player is performing
+        if self.health <= 0:
+            self.health,self.dead =0,True
+            self.update_action(6)
+        elif self.hit:self.update_action(5)
+        elif self.attacking:
+            if self.attack_type==1:self.update_action(3)  
+            elif self.attack_type==2:self.update_action(4)
+        elif self.jumping: self.update_action(2)
+        elif self.running: self.update_action(1)
+        else: self.update_action(0)
+            
+
+        # Update Image
+        self.image = self.animation_list[self.action][self.frame_index]
+
+        # Check if enough time has passed since last update
+        if pg.time.get_ticks() - self.update_time > animation_cooldown:
+            self.frame_index+=1
+            self.update_time = pg.time.get_ticks()
+        
+        # Check if the animation has finished
+        if self.frame_index >= len(self.animation_list[self.action]):
+
+            # If the player is dead then end the animation
+            if self.dead: self.frame_index = len(self.animation_list[self.action]) - 1
+            else:
+                self.frame_index = 0
+
+                # Checking if the attack animation was executed
+                # After finishing the animation , reset back to idle
+                if self.action in (3,4): 
+                    self.attacking = False
+                    self.attack_cooldown = 30
+
+                # Checking if the attack animation was executed
+                # After finishing the animation , reset back to idle
+                if self.action==5: 
+                    self.hit = False
+
+                    # If the player was in the middle of an attack , then the attack is stopped
+                    self.attacking = False
+                    self.attack_cooldown = 30
+                 
+
+    def update_action(self,next_action):
+        if self.action != next_action:
+            self.action = next_action
+
+            # Update the animation settings
+            self.frame_index , self.update_time = 0, pg.time.get_ticks()
+
+    def load_images(self,sprite_spreedsheet,animation_steps):
+        animation_list=[]
+        for y,animation in enumerate(animation_steps):
+            temporary_image_list =[]
+            for x in range(animation):
+                temporary_image = sprite_spreedsheet.subsurface(x*self.size,y*self.size,self.size,self.size)
+                temporary_image_list.append(pg.transform.scale(temporary_image,(self.size*self.image_scale,self.size*self.image_scale)))
+            animation_list.append(temporary_image_list)
+        return animation_list
+
+    def draw(self,surface):
+        img = pg.transform.flip(surface=self.image, flip_x=self.flip, flip_y=False)
+        surface.blit(source=img,dest=(self.rect.x - (self.offset[0]*self.image_scale) ,self.rect.y - (self.offset[1]*self.image_scale)))
+
+    def move(self,target,round_over):
+        dx = dy = 0
+        self.running ,self.attack_type = False , 0
+
+        # Get Key Presses
+        key = pg.key.get_pressed()
+
+        # Can only perform other actions if not currently attacking
+        if not self.attacking and not self.dead and not round_over:
+            if self.player==1:
+                # Movement
+                if key[pg.K_a]:
+                    dx = -FIGHTER_SPEED
+                    self.running = True
+                if key[pg.K_d]:
+                    dx = FIGHTER_SPEED
+                    self.running = True
+
+                # Jump
+                if key[pg.K_w] and not self.jumping:
+                    self.y_velocity = -30
+                    self.jumping = True
+                
+                # Attack
+                if key[pg.K_t] or key[pg.K_f]:
+                    self.attack(target=target)
+                    # Attack Initiated
+                    if key[pg.K_t]: self.attack_type=1
+                    if key[pg.K_f]: self.attack_type=2
+            
+            if self.player==2:
+                # Movement
+                if key[pg.K_LEFT]:
+                    dx = -FIGHTER_SPEED
+                    self.running = True
+                if key[pg.K_RIGHT]:
+                    dx = FIGHTER_SPEED
+                    self.running = True
+
+                # Jump
+                if key[pg.K_UP] and not self.jumping:
+                    self.y_velocity = -30
+                    self.jumping = True
+                
+                # Attack
+                if key[pg.K_p] or key[pg.K_l]:
+                    self.attack(target=target)
+                    # Attack Initiated
+                    if key[pg.K_p]: self.attack_type=1
+                    if key[pg.K_l]: self.attack_type=2
+
+        # Apply Gravity
+        self.y_velocity += GRAVITY
+        dy += self.y_velocity
+
+        # Ensures Player Stays On The Screen
+
+        # Left/Right
+        if self.rect.left + dx <0:
+            dx = -self.rect.left
+        if self.rect.right + dx > SCREEN_WIDTH:
+            dx = SCREEN_WIDTH- self.rect.right
+
+        # Up/Down
+        if self.rect.bottom + dy > SCREEN_HEIGHT - 110:
+            self.y_velocity=0
+            self.jumping = False
+            dy = SCREEN_HEIGHT-110-self.rect.bottom
+
+        # Ensure player face each other
+        self.flip = False if target.rect.centerx > self.rect.centerx else True
+
+        # Apply cooldown
+        if self.attack_cooldown > 0 : self.attack_cooldown-=1
+        
+        # Update Player Position
+        self.rect.x +=dx
+        self.rect.y +=dy
+
+    def attack(self,target):
+        if not self.attack_cooldown:
+            self.attacking = True
+            self.attack_sound.play()
+
+            attacking_rect = pg.Rect(self.rect.centerx - (2*self.rect.width*self.flip), self.rect.y,2*self.rect.width,self.rect.height)
+
+            if attacking_rect.colliderect(target.rect):
+                target.health -= 10
+                target.hit = True
+
+
+
+
 
 # Draw text on the screen
 def draw_text(text,font,text_color,x,y):
